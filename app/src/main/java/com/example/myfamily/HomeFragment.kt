@@ -1,5 +1,6 @@
 package com.example.myfamily
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.util.Log
@@ -12,13 +13,12 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.jetbrains.annotations.Contract
 
 class HomeFragment : Fragment() {
 
-    private val listContacts: ArrayList<ContactModel> = ArrayList()
+    private lateinit var inviteAdapter : InviteAdapter
 
+    private val listContacts: ArrayList<ContactModel> = ArrayList()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -32,10 +32,11 @@ class HomeFragment : Fragment() {
         return inflater.inflate(R.layout.fragment_home, container, false)
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val listMembers = listOf<MemberModel>(
+        val listMembers = listOf(
                 MemberModel(
                     "Naina",
                     "9th buildind, 2nd floor, maldiv road, manali 9th buildind, 2nd floor",
@@ -43,7 +44,7 @@ class HomeFragment : Fragment() {
                     "220"
                 ),
                 MemberModel(
-                    "Painuly",
+                    "Tae",
                     "10th buildind, 3rd floor, maldiv road, manali 10th buildind, 3rd floor",
                     "80%",
                     "210"
@@ -55,7 +56,7 @@ class HomeFragment : Fragment() {
                     "200"
                 ),
                 MemberModel(
-                    "Tae",
+                    "Painuly",
                     "12th buildind, 5th floor, maldiv road, manali 12th buildind, 5th floor",
                     "60%",
                     "190"
@@ -68,19 +69,19 @@ class HomeFragment : Fragment() {
         val recycler = requireView().findViewById<RecyclerView>(R.id.recycler_member)
         recycler.layoutManager = LinearLayoutManager(requireContext())
         recycler.adapter = adapter
+
+
         Log.d("fetchContact89", "fetchContacts: start karna wale hain")
 
         Log.d("fetchContact89", "fetchContacts: start hogya hai ${listContacts.size}")
-        val inviteAdapter = InviteAdapter(listContacts)
+        inviteAdapter = InviteAdapter(listContacts)
+        fetchDatabaseContacts()
         Log.d("fetchContact89", "fetchContacts: end hogya hai")
 
         CoroutineScope(Dispatchers.IO).launch {
             Log.d("fetchContact89", "fetchContacts: coroutine start")
-            listContacts.addAll(fetchContacts())
 
-            withContext(Dispatchers.Main){
-                inviteAdapter.notifyDataSetChanged()
-            }
+            insertDatabaseContacts(fetchContacts()) //takes all contacts and insert it in database
 
             Log.d("fetchContact89", "fetchContacts: coroutine end ${listContacts.size}")
         }
@@ -91,6 +92,30 @@ class HomeFragment : Fragment() {
 
     }
 
+    @SuppressLint("NotifyDataSetChanged")
+    private fun fetchDatabaseContacts() {
+        val database = MyFamilyDatabase.getDatabase(requireContext())
+
+      database.contactDao().getAllContacts().observe(viewLifecycleOwner){
+
+          Log.d("fetchContact89", "fetchDatabaseContacts: ")
+
+          listContacts.clear()
+          listContacts.addAll(it)
+
+          inviteAdapter.notifyDataSetChanged()
+
+      }
+    }
+
+    private suspend fun insertDatabaseContacts(listContacts: ArrayList<ContactModel>) {
+
+
+        val database = MyFamilyDatabase.getDatabase(requireContext())
+
+        database.contactDao().insertAll(listContacts)
+    }
+
     private fun fetchContacts() : ArrayList<ContactModel>{
 
         Log.d("fetchContact89", "fetchContacts: start")
@@ -98,7 +123,7 @@ class HomeFragment : Fragment() {
         val cursor = cr.query(ContactsContract.Contacts.CONTENT_URI,null,null,null,null)
         val listContacts:ArrayList<ContactModel> = ArrayList()
         if(cursor!=null && cursor.count>0){
-            while(cursor!=null && cursor.moveToNext()){
+            while((cursor != null) && cursor.moveToNext()){
                 val id = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID))
                 val name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME))
                 val hasPhoneNumber = cursor.getInt(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.HAS_PHONE_NUMBER))
